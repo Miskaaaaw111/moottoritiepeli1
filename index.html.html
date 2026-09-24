@@ -1,0 +1,1259 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Moottoritie - Autotalli & Virityskauppa</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+        }
+
+        body {
+            background-color: #090d16;
+            color: #f1f5f9;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+
+        #game-wrapper {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 440px;
+            height: 100vh;
+            max-height: 800px;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background-color: #0f172a;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.85);
+            border-radius: 20px;
+            overflow: hidden;
+            border: 3px solid #1e293b;
+            display: flex;
+            flex-direction: column;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            flex-grow: 1;
+        }
+
+        /* HUD Header */
+        #hud {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            right: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 5;
+            pointer-events: none;
+        }
+
+        .hud-badge {
+            background: rgba(15, 23, 42, 0.88);
+            backdrop-filter: blur(8px);
+            padding: 6px 12px;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            font-size: 13px;
+            font-weight: 700;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .hud-value {
+            color: #38bdf8;
+            font-size: 14px;
+            font-weight: 800;
+        }
+
+        .coin-val {
+            color: #fbbf24;
+        }
+
+        .rev-limiter-active {
+            color: #ef4444 !important;
+            animation: bounceShake 0.08s infinite alternate;
+        }
+
+        @keyframes bounceShake {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.08); }
+        }
+
+        /* Mobile Touch Controls Container */
+        #touch-controls {
+            position: absolute;
+            bottom: 12px;
+            left: 12px;
+            right: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            z-index: 8;
+            pointer-events: none;
+        }
+
+        .touch-group {
+            display: flex;
+            gap: 10px;
+            pointer-events: auto;
+        }
+
+        .touch-btn {
+            background: rgba(15, 23, 42, 0.75);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(8px);
+            color: #ffffff;
+            font-size: 20px;
+            font-weight: 900;
+            width: 62px;
+            height: 62px;
+            border-radius: 18px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.5);
+            transition: transform 0.08s, background 0.08s;
+            touch-action: manipulation;
+        }
+
+        .touch-btn:active, .touch-btn.active {
+            transform: scale(0.92);
+            background: rgba(56, 189, 248, 0.4);
+            border-color: #38bdf8;
+        }
+
+        .touch-btn-gas {
+            background: rgba(16, 185, 129, 0.35);
+            border-color: rgba(16, 185, 129, 0.6);
+            height: 75px;
+            width: 65px;
+        }
+
+        .touch-btn-gas:active, .touch-btn-gas.active {
+            background: rgba(16, 185, 129, 0.7);
+            border-color: #10b981;
+        }
+
+        .touch-btn-brake {
+            background: rgba(239, 68, 68, 0.35);
+            border-color: rgba(239, 68, 68, 0.6);
+            height: 65px;
+            width: 60px;
+        }
+
+        .touch-btn-brake:active, .touch-btn-brake.active {
+            background: rgba(239, 68, 68, 0.7);
+            border-color: #ef4444;
+        }
+
+        /* Overlay & Menu Screens */
+        .overlay-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(15, 23, 42, 0.94);
+            backdrop-filter: blur(10px);
+            z-index: 10;
+            padding: 24px;
+            box-sizing: border-box;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 900;
+            background: linear-gradient(135deg, #38bdf8, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .subtitle {
+            font-size: 12px;
+            color: #94a3b8;
+            line-height: 1.4;
+            margin-top: 4px;
+        }
+
+        /* Buttons Styling */
+        .btn-main {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 15px;
+            font-weight: 800;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 8px 16px -2px rgba(16, 185, 129, 0.4);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            width: 100%;
+        }
+
+        .btn-main:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 20px -2px rgba(16, 185, 129, 0.5);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #0284c7, #2563eb);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 13px;
+            font-weight: 700;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            width: 100%;
+            margin-top: 8px;
+            box-shadow: 0 6px 12px -2px rgba(2, 132, 199, 0.4);
+        }
+
+        .btn-secondary:hover {
+            transform: translateY(-2px);
+        }
+
+        .difficulty-section {
+            width: 100%;
+            margin: 6px 0;
+        }
+
+        .section-label {
+            font-size: 11px;
+            font-weight: 700;
+            color: #cbd5e1;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+        }
+
+        .diff-selector {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .diff-btn {
+            background: #1e293b;
+            color: #94a3b8;
+            border: 2px solid transparent;
+            width: 36px;
+            height: 36px;
+            font-size: 14px;
+            font-weight: 800;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .diff-btn.active {
+            background: #0284c7;
+            color: #fff;
+            border-color: #38bdf8;
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+        }
+
+        /* Tuning Shop UI */
+        .garage-container {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin: 8px 0;
+            text-align: left;
+        }
+
+        .upgrade-card {
+            background: rgba(30, 41, 59, 0.75);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 10px 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .upgrade-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .upgrade-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #f1f5f9;
+        }
+
+        .upgrade-desc {
+            font-size: 11px;
+            color: #38bdf8;
+            font-weight: 600;
+        }
+
+        .upgrade-bar-bg {
+            width: 90px;
+            height: 8px;
+            background: #0f172a;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 4px;
+        }
+
+        .upgrade-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #38bdf8, #818cf8);
+            width: 20%;
+            transition: width 0.3s ease;
+        }
+
+        .btn-upgrade {
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            font-size: 11px;
+            font-weight: 800;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .btn-upgrade:disabled {
+            background: #334155;
+            color: #64748b;
+            cursor: not-allowed;
+        }
+
+        .color-picker {
+            display: flex;
+            gap: 8px;
+            margin-top: 4px;
+        }
+
+        .color-opt {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .color-opt.selected {
+            border-color: #ffffff;
+            transform: scale(1.2);
+            box-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
+        }
+
+        .stat-grid {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+            justify-content: center;
+        }
+
+        .stat-box {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 8px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .stat-lbl {
+            font-size: 10px;
+            color: #94a3b8;
+            text-transform: uppercase;
+        }
+
+        .stat-val {
+            font-size: 15px;
+            font-weight: 800;
+            color: #fbbf24;
+        }
+
+        .controls-hint {
+            font-size: 11px;
+            color: #64748b;
+            background: rgba(255, 255, 255, 0.04);
+            padding: 6px 12px;
+            border-radius: 6px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-wrapper">
+        <div id="game-container">
+            <!-- HUD Panel -->
+            <div id="hud">
+                <div class="hud-badge">🏁 <span id="speed-gauge" class="hud-value">0 km/h</span></div>
+                <div class="hud-badge">🪙 <span id="hud-coins" class="hud-value coin-val">0</span></div>
+                <div class="hud-badge">Pisteet: <span id="hud-score" class="hud-value">0</span></div>
+            </div>
+
+            <!-- Touch / Mobile On-Screen Controls -->
+            <div id="touch-controls">
+                <div class="touch-group">
+                    <div class="touch-btn" id="btn-left">◀</div>
+                    <div class="touch-btn" id="btn-right">▶</div>
+                </div>
+                <div class="touch-group">
+                    <div class="touch-btn touch-btn-brake" id="btn-brake">🛑</div>
+                    <div class="touch-btn touch-btn-gas" id="btn-gas">🚀</div>
+                </div>
+            </div>
+
+            <!-- OVERLAY: Main Menu / Game Over -->
+            <div id="ui-overlay" class="overlay-screen">
+                <div>
+                    <h1 id="title">MOOTTORITIE 2D</h1>
+                    <p id="description" class="subtitle">Aja autolla näytön napeilla tai WASD/nuolinäppäimillä!</p>
+                </div>
+
+                <div id="stats-container" class="stat-grid" style="display: none;">
+                    <div class="stat-box">
+                        <div class="stat-lbl">Pisteet</div>
+                        <div id="final-score" class="stat-val">0</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-lbl">Uudet Kolikot</div>
+                        <div id="earned-coins" class="stat-val" style="color:#10b981;">+0</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-lbl">Ennätys</div>
+                        <div id="high-score" class="stat-val">0</div>
+                    </div>
+                </div>
+
+                <div class="difficulty-section">
+                    <div class="section-label">Vaikeustaso (1 - 5)</div>
+                    <div class="diff-selector">
+                        <button class="diff-btn active" onclick="setDifficulty(1)">1</button>
+                        <button class="diff-btn" onclick="setDifficulty(2)">2</button>
+                        <button class="diff-btn" onclick="setDifficulty(3)">3</button>
+                        <button class="diff-btn" onclick="setDifficulty(4)">4</button>
+                        <button class="diff-btn" onclick="setDifficulty(5)">5</button>
+                    </div>
+                </div>
+
+                <div style="width: 100%;">
+                    <button class="btn-main" id="start-btn" onclick="startGame()">ALOITA AJO</button>
+                    <button class="btn-secondary" onclick="openGarage()">🏎️ AUTOTALLI & VIRITYSKAUPPA</button>
+                </div>
+
+                <div class="controls-hint">W/Nooli Ylös = Kaasu | S/Nooli Alas = Jarru | A/D = Ohjaus</div>
+            </div>
+
+            <!-- OVERLAY: Tuning Shop -->
+            <div id="garage-overlay" class="overlay-screen" style="display: none;">
+                <div>
+                    <h1>AUTOTALLI & KAUPPA</h1>
+                    <p class="subtitle">Päivitä moottoria ja jarruja suorituskyvyn parantamiseksi!</p>
+                </div>
+
+                <div class="hud-badge" style="align-self: center; background: rgba(0,0,0,0.5);">
+                    Kassassa: 🪙 <span id="garage-coins" class="hud-value coin-val">0</span>
+                </div>
+
+                <div class="garage-container">
+                    <!-- Engine Upgrade -->
+                    <div class="upgrade-card">
+                        <div class="upgrade-info">
+                            <div class="upgrade-title">Moottori (Taso <span id="engine-lvl-txt">1</span>/5)</div>
+                            <div class="upgrade-desc" id="engine-name-txt">Inline 4</div>
+                            <div class="upgrade-bar-bg">
+                                <div id="engine-bar" class="upgrade-bar-fill"></div>
+                            </div>
+                        </div>
+                        <button id="btn-up-engine" class="btn-upgrade" onclick="buyUpgrade('engine')">PÄIVITÄ<br><span id="cost-engine">50 🪙</span></button>
+                    </div>
+
+                    <!-- Brake Upgrade -->
+                    <div class="upgrade-card">
+                        <div class="upgrade-info">
+                            <div class="upgrade-title">Jarrut (Taso <span id="brake-lvl-txt">1</span>/5)</div>
+                            <div class="upgrade-desc" id="brake-name-txt">Vakiojarrut</div>
+                            <div class="upgrade-bar-bg">
+                                <div id="brake-bar" class="upgrade-bar-fill"></div>
+                            </div>
+                        </div>
+                        <button id="btn-up-brake" class="btn-upgrade" onclick="buyUpgrade('brake')">PÄIVITÄ<br><span id="cost-brake">40 🪙</span></button>
+                    </div>
+
+                    <!-- Car Color -->
+                    <div class="upgrade-card">
+                        <div class="upgrade-info">
+                            <div class="upgrade-title">Auton Maali</div>
+                            <div class="color-picker">
+                                <div class="color-opt selected" style="background:#38bdf8;" onclick="selectColor('#38bdf8', this)"></div>
+                                <div class="color-opt" style="background:#ef4444;" onclick="selectColor('#ef4444', this)"></div>
+                                <div class="color-opt" style="background:#10b981;" onclick="selectColor('#10b981', this)"></div>
+                                <div class="color-opt" style="background:#f59e0b;" onclick="selectColor('#f59e0b', this)"></div>
+                                <div class="color-opt" style="background:#8b5cf6;" onclick="selectColor('#8b5cf6', this)"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="btn-main" onclick="closeGarage()">TAKASIN VALIKKOON</button>
+            </div>
+
+            <canvas id="gameCanvas" width="440" height="680"></canvas>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // UI Elements
+        const hudScore = document.getElementById('hud-score');
+        const hudCoins = document.getElementById('hud-coins');
+        const speedGauge = document.getElementById('speed-gauge');
+        const uiOverlay = document.getElementById('ui-overlay');
+        const garageOverlay = document.getElementById('garage-overlay');
+        const titleEl = document.getElementById('title');
+        const descEl = document.getElementById('description');
+        const startBtn = document.getElementById('start-btn');
+        const statsContainer = document.getElementById('stats-container');
+        const finalScoreEl = document.getElementById('final-score');
+        const earnedCoinsEl = document.getElementById('earned-coins');
+        const highScoreEl = document.getElementById('high-score');
+        const garageCoinsEl = document.getElementById('garage-coins');
+
+        // Geometry Constants
+        const ROAD_LEFT = 60;
+        const ROAD_WIDTH = 320;
+        const LANES = [100, 180, 260, 340];
+
+        // Persistence (localStorage)
+        let coins = parseInt(localStorage.getItem('highway_coins')) || 0;
+        let highScore = parseInt(localStorage.getItem('highway_high_score')) || 0;
+        let engineLevel = parseInt(localStorage.getItem('highway_engine_lvl')) || 1;
+        let brakeLevel = parseInt(localStorage.getItem('highway_brake_lvl')) || 1;
+        let playerColor = localStorage.getItem('highway_color') || '#38bdf8';
+
+        let isGameRunning = false;
+        let score = 0;
+        let earnedInRun = 0;
+        let difficultyLevel = 1;
+        let roadOffset = 0;
+        let animationFrameId;
+
+        // Upgrade Tables
+        const engineCosts = [0, 50, 120, 250, 500];
+        const brakeCosts = [0, 40, 100, 200, 400];
+        const engineNames = [
+            "",
+            "Taso 1: Inline 4",
+            "Taso 2: Inline 4 Turbo",
+            "Taso 3: V6 Turbo",
+            "Taso 4: V8 Twin Turbo",
+            "Taso 5: V10 Twin Turbo"
+        ];
+        const brakeNames = [
+            "",
+            "Taso 1: Vakiojarrut",
+            "Taso 2: Katujarrut",
+            "Taso 3: Urheilujarrut",
+            "Taso 4: Keraamiset Jarrut",
+            "Taso 5: Kilpajarrut"
+        ];
+
+        // Player Vehicle State
+        const player = {
+            width: 36,
+            height: 64,
+            x: LANES[1] - 18,
+            y: 520,
+            currentSpeed: 0,
+            maxSpeed: 5,        
+            accel: 0.035,        // Halved acceleration rate
+            brakeForce: 0.12,   
+            friction: 0.025,
+            
+            // Steering Physics
+            angle: 0,            
+            angularVel: 0,       
+            lateralVelocity: 0,  
+            maxAngle: 0.22,      
+            
+            color: playerColor,
+            isBouncingLimiter: false,
+            limiterTimer: 0
+        };
+
+        const keys = { w: false, a: false, s: false, d: false };
+
+        let enemies = [];
+        let particles = [];
+        let flames = [];
+        let spawnTimer = 0;
+
+        // Web Audio API Sound Synthesizer
+        let audioCtx = null;
+        let engineOsc = null;
+        let subOsc = null;
+        let engineGain = null;
+        let turboOsc = null;
+        let turboGain = null;
+        let isAudioInit = false;
+        let lastWState = false;
+
+        function initAudioEngine() {
+            if (isAudioInit) return;
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContext();
+
+            // Internal Combustion Audio Oscillators
+            engineOsc = audioCtx.createOscillator();
+            subOsc = audioCtx.createOscillator();
+            engineGain = audioCtx.createGain();
+
+            engineOsc.type = 'sawtooth';
+            subOsc.type = 'triangle';
+
+            engineGain.gain.setValueAtTime(0, audioCtx.currentTime);
+
+            engineOsc.connect(engineGain);
+            subOsc.connect(engineGain);
+            engineGain.connect(audioCtx.destination);
+
+            engineOsc.start();
+            subOsc.start();
+
+            // Turbo Spool Whine
+            turboOsc = audioCtx.createOscillator();
+            turboGain = audioCtx.createGain();
+            turboOsc.type = 'sine';
+            turboGain.gain.setValueAtTime(0, audioCtx.currentTime);
+            turboOsc.connect(turboGain);
+            turboGain.connect(audioCtx.destination);
+            turboOsc.start();
+
+            isAudioInit = true;
+        }
+
+        // Backfire pop sound synthesis
+        function playBackfirePop() {
+            if (!audioCtx) return;
+            const bufferSize = audioCtx.sampleRate * 0.04; 
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = buffer;
+
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'bandpass';
+            filter.frequency.value = 600 + Math.random() * 800;
+
+            const gain = audioCtx.createGain();
+            gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.04);
+
+            noise.connect(filter);
+            filter.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            noise.start();
+        }
+
+        // Turbo Blow-Off Valve ('PSSH!')
+        function playBlowOffValve() {
+            if (!audioCtx || engineLevel < 2) return;
+            const bufferSize = audioCtx.sampleRate * 0.15;
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = buffer;
+
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'highpass';
+            filter.frequency.value = 2200;
+
+            const gain = audioCtx.createGain();
+            gain.gain.setValueAtTime(0.35, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+
+            noise.connect(filter);
+            filter.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            noise.start();
+        }
+
+        function updateAudioEngine() {
+            if (!isAudioInit || !audioCtx) return;
+
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            // Blow-off valve logic when releasing gas
+            if (lastWState && !keys.w && player.currentSpeed > 3 && engineLevel >= 2) {
+                playBlowOffValve();
+            }
+            lastWState = keys.w;
+
+            const ratio = player.currentSpeed / player.maxSpeed;
+            
+            // REV LIMITER (BOUNCER / PAUKKU-RAJOTIN)
+            if (keys.w && ratio >= 0.98) {
+                player.isBouncingLimiter = true;
+                player.limiterTimer += 1;
+
+                // Ignition Stutter
+                const isIgnitionCut = (Math.floor(player.limiterTimer / 2) % 2 === 0);
+
+                if (isIgnitionCut) {
+                    engineGain.gain.setValueAtTime(0.02, audioCtx.currentTime);
+                } else {
+                    engineGain.gain.setValueAtTime(0.20, audioCtx.currentTime);
+                    if (player.limiterTimer % 2 === 0) {
+                        playBackfirePop();
+                        triggerExhaustFlame();
+                    }
+                }
+
+                const baseFreq = 70 + (engineLevel * 15) + (ratio * 110);
+                engineOsc.frequency.setValueAtTime(baseFreq, audioCtx.currentTime);
+                subOsc.frequency.setValueAtTime(baseFreq * 0.5, audioCtx.currentTime);
+
+                speedGauge.classList.add('rev-limiter-active');
+            } else {
+                player.isBouncingLimiter = false;
+                player.limiterTimer = 0;
+                speedGauge.classList.remove('rev-limiter-active');
+
+                const baseFreq = 40 + (engineLevel * 12) + (ratio * 120);
+                engineOsc.frequency.setValueAtTime(baseFreq, audioCtx.currentTime);
+                subOsc.frequency.setValueAtTime(baseFreq * 0.5, audioCtx.currentTime);
+
+                const volume = isGameRunning ? Math.max(0.03, ratio * 0.18) : 0;
+                engineGain.gain.setValueAtTime(volume, audioCtx.currentTime);
+            }
+
+            // Turbo Spool Whine
+            if (engineLevel >= 2 && keys.w) {
+                turboGain.gain.setValueAtTime(ratio * 0.06, audioCtx.currentTime);
+                turboOsc.frequency.setValueAtTime(800 + (ratio * 2500), audioCtx.currentTime);
+            } else {
+                turboGain.gain.setValueAtTime(0, audioCtx.currentTime);
+            }
+        }
+
+        function triggerExhaustFlame() {
+            flames.push({
+                x: player.x + player.width / 2 + (Math.random() * 10 - 5),
+                y: player.y + player.height + 4,
+                size: Math.random() * 8 + 5,
+                life: 1.0,
+                color: Math.random() > 0.4 ? '#ef4444' : '#f59e0b'
+            });
+        }
+
+        function applyTuningStats() {
+            player.maxSpeed = 4.2 + (engineLevel * 2.5);
+            player.accel = 0.03 + (engineLevel * 0.022); // Progressive acceleration
+            player.brakeForce = 0.08 + (brakeLevel * 0.06);
+            player.color = playerColor;
+        }
+
+        function updateGarageUI() {
+            garageCoinsEl.textContent = coins;
+            hudCoins.textContent = coins;
+
+            // Engine UI
+            document.getElementById('engine-lvl-txt').textContent = engineLevel;
+            document.getElementById('engine-name-txt').textContent = engineNames[engineLevel];
+            document.getElementById('engine-bar').style.width = `${(engineLevel / 5) * 100}%`;
+            const btnEngine = document.getElementById('btn-up-engine');
+            if (engineLevel >= 5) {
+                btnEngine.disabled = true;
+                btnEngine.innerHTML = "MAKSI";
+            } else {
+                const cost = engineCosts[engineLevel];
+                btnEngine.disabled = coins < cost;
+                document.getElementById('cost-engine').textContent = `${cost} 🪙`;
+            }
+
+            // Brake UI
+            document.getElementById('brake-lvl-txt').textContent = brakeLevel;
+            document.getElementById('brake-name-txt').textContent = brakeNames[brakeLevel];
+            document.getElementById('brake-bar').style.width = `${(brakeLevel / 5) * 100}%`;
+            const btnBrake = document.getElementById('btn-up-brake');
+            if (brakeLevel >= 5) {
+                btnBrake.disabled = true;
+                btnBrake.innerHTML = "MAKSI";
+            } else {
+                const cost = brakeCosts[brakeLevel];
+                btnBrake.disabled = coins < cost;
+                document.getElementById('cost-brake').textContent = `${cost} 🪙`;
+            }
+        }
+
+        function buyUpgrade(type) {
+            if (type === 'engine' && engineLevel < 5) {
+                const cost = engineCosts[engineLevel];
+                if (coins >= cost) {
+                    coins -= cost;
+                    engineLevel++;
+                    localStorage.setItem('highway_coins', coins);
+                    localStorage.setItem('highway_engine_lvl', engineLevel);
+                }
+            } else if (type === 'brake' && brakeLevel < 5) {
+                const cost = brakeCosts[brakeLevel];
+                if (coins >= cost) {
+                    coins -= cost;
+                    brakeLevel++;
+                    localStorage.setItem('highway_coins', coins);
+                    localStorage.setItem('highway_brake_lvl', brakeLevel);
+                }
+            }
+            applyTuningStats();
+            updateGarageUI();
+        }
+
+        function selectColor(color, el) {
+            playerColor = color;
+            localStorage.setItem('highway_color', color);
+            document.querySelectorAll('.color-opt').forEach(opt => opt.classList.remove('selected'));
+            el.classList.add('selected');
+            applyTuningStats();
+        }
+
+        function openGarage() {
+            updateGarageUI();
+            uiOverlay.style.display = 'none';
+            garageOverlay.style.display = 'flex';
+        }
+
+        function closeGarage() {
+            garageOverlay.style.display = 'none';
+            uiOverlay.style.display = 'flex';
+        }
+
+        // Keyboard Controls
+        window.addEventListener('keydown', (e) => {
+            const k = e.key.toLowerCase();
+            if (k === 'w' || e.key === 'ArrowUp') keys.w = true;
+            if (k === 'a' || e.key === 'ArrowLeft') keys.a = true;
+            if (k === 's' || e.key === 'ArrowDown') keys.s = true;
+            if (k === 'd' || e.key === 'ArrowRight') keys.d = true;
+        });
+
+        window.addEventListener('keyup', (e) => {
+            const k = e.key.toLowerCase();
+            if (k === 'w' || e.key === 'ArrowUp') keys.w = false;
+            if (k === 'a' || e.key === 'ArrowLeft') keys.a = false;
+            if (k === 's' || e.key === 'ArrowDown') keys.s = false;
+            if (k === 'd' || e.key === 'ArrowRight') keys.d = false;
+        });
+
+        // Mobile / Touch Controls Handler
+        function bindTouchBtn(elementId, keyName) {
+            const btn = document.getElementById(elementId);
+            
+            const startPress = (e) => {
+                e.preventDefault();
+                keys[keyName] = true;
+                btn.classList.add('active');
+            };
+
+            const endPress = (e) => {
+                e.preventDefault();
+                keys[keyName] = false;
+                btn.classList.remove('active');
+            };
+
+            btn.addEventListener('touchstart', startPress, { passive: false });
+            btn.addEventListener('touchend', endPress, { passive: false });
+            btn.addEventListener('touchcancel', endPress, { passive: false });
+            btn.addEventListener('mousedown', startPress);
+            btn.addEventListener('mouseup', endPress);
+            btn.addEventListener('mouseleave', endPress);
+        }
+
+        bindTouchBtn('btn-left', 'a');
+        bindTouchBtn('btn-right', 'd');
+        bindTouchBtn('btn-gas', 'w');
+        bindTouchBtn('btn-brake', 's');
+
+        function setDifficulty(lvl) {
+            difficultyLevel = lvl;
+            document.querySelectorAll('.diff-btn').forEach((btn, idx) => {
+                btn.classList.toggle('active', idx + 1 === lvl);
+            });
+        }
+
+        function startGame() {
+            initAudioEngine();
+            applyTuningStats();
+
+            uiOverlay.style.display = 'none';
+            garageOverlay.style.display = 'none';
+            
+            score = 0;
+            earnedInRun = 0;
+            
+            hudScore.textContent = score;
+            hudCoins.textContent = coins;
+            speedGauge.textContent = "0 km/h";
+            
+            enemies = [];
+            particles = [];
+            flames = [];
+            spawnTimer = 0;
+
+            player.currentSpeed = 0;
+            player.x = LANES[1] - 18;
+            player.y = 520;
+            player.angle = 0;
+            player.angularVel = 0;
+            player.lateralVelocity = 0;
+
+            isGameRunning = true;
+            gameLoop();
+        }
+
+        function gameOver() {
+            isGameRunning = false;
+            cancelAnimationFrame(animationFrameId);
+
+            if (engineGain) engineGain.gain.setValueAtTime(0, audioCtx.currentTime);
+            playBackfirePop();
+
+            // Save run earnings
+            coins += earnedInRun;
+            localStorage.setItem('highway_coins', coins);
+
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('highway_high_score', highScore);
+            }
+
+            // Crash Explosion
+            for (let i = 0; i < 35; i++) {
+                particles.push({
+                    x: player.x + player.width / 2,
+                    y: player.y + player.height / 2,
+                    vx: (Math.random() - 0.5) * 12,
+                    vy: (Math.random() - 0.5) * 12,
+                    size: Math.random() * 8 + 2,
+                    color: ['#ef4444', '#f59e0b', '#fbbf24', '#ffffff'][Math.floor(Math.random() * 4)],
+                    alpha: 1
+                });
+            }
+
+            finalScoreEl.textContent = score;
+            earnedCoinsEl.textContent = `+${earnedInRun}`;
+            highScoreEl.textContent = highScore;
+            hudCoins.textContent = coins;
+
+            titleEl.textContent = "KOLARI!";
+            descEl.textContent = "Aja varovaisemmin! Päivitä jarruja tai moottoria kaupassa suorituskyvyn parantamiseksi.";
+            startBtn.textContent = "PELAA UUDELLEEN";
+            statsContainer.style.display = 'flex';
+            uiOverlay.style.display = 'flex';
+        }
+
+        function spawnEnemy() {
+            const laneIndex = Math.floor(Math.random() * 4);
+            const laneX = LANES[laneIndex];
+
+            for (let enemy of enemies) {
+                if (enemy.lane === laneIndex && enemy.y < 120) return;
+            }
+
+            const colors = ['#ef4444', '#f97316', '#a855f7', '#10b981', '#eab308'];
+            const randomColor = colors[Math.floor(Math.random() * colors.length)];
+            const baseTrafficSpeed = 2.2 + (difficultyLevel * 0.7);
+
+            enemies.push({
+                x: laneX - 18,
+                y: -90,
+                width: 36,
+                height: 64,
+                lane: laneIndex,
+                color: randomColor,
+                speed: baseTrafficSpeed + (Math.random() * 1.0 - 0.5)
+            });
+        }
+
+        function update() {
+            // Acceleration & Braking
+            if (keys.w) {
+                player.currentSpeed += player.accel;
+                if (player.currentSpeed > player.maxSpeed) player.currentSpeed = player.maxSpeed;
+            } else if (keys.s) {
+                player.currentSpeed -= player.brakeForce;
+                if (player.currentSpeed < 0) player.currentSpeed = 0;
+            } else {
+                player.currentSpeed -= player.friction;
+                if (player.currentSpeed < 0) player.currentSpeed = 0;
+            }
+
+            // Realistic Speed-Sensitive Steering Physics
+            const speedRatio = Math.min(1.0, player.currentSpeed / 2.5);
+            
+            if (speedRatio > 0.05) {
+                if (keys.a) {
+                    player.angularVel -= 0.035 * speedRatio;
+                } else if (keys.d) {
+                    player.angularVel += 0.035 * speedRatio;
+                } else {
+                    player.angularVel -= player.angle * 0.12;
+                }
+
+                player.angularVel *= 0.78;
+                player.angle += player.angularVel;
+
+                if (player.angle > player.maxAngle) player.angle = player.maxAngle;
+                if (player.angle < -player.maxAngle) player.angle = -player.maxAngle;
+
+                const steeringForce = Math.sin(player.angle) * (player.currentSpeed * 1.35);
+                player.lateralVelocity = (player.lateralVelocity * 0.82) + (steeringForce * 0.18);
+            } else {
+                player.angle *= 0.8;
+                player.lateralVelocity *= 0.5;
+            }
+
+            player.x += player.lateralVelocity;
+
+            // Road Limits
+            const minX = ROAD_LEFT + 8;
+            const maxX = ROAD_LEFT + ROAD_WIDTH - player.width - 8;
+            if (player.x < minX) {
+                player.x = minX;
+                player.lateralVelocity = 0;
+                player.angle = 0;
+            }
+            if (player.x > maxX) {
+                player.x = maxX;
+                player.lateralVelocity = 0;
+                player.angle = 0;
+            }
+
+            roadOffset = (roadOffset + player.currentSpeed) % 40;
+
+            // Traffic Spawning
+            spawnTimer++;
+            const spawnFrequency = Math.max(22, 60 - (difficultyLevel * 7));
+            if (spawnTimer > spawnFrequency) {
+                spawnEnemy();
+                spawnTimer = 0;
+            }
+
+            // Traffic Movement & Collisions
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                let e = enemies[i];
+                const relativeSpeed = player.currentSpeed - e.speed;
+                e.y += relativeSpeed;
+
+                const p = 5;
+                if (
+                    player.x + p < e.x + e.width - p &&
+                    player.x + player.width - p > e.x + p &&
+                    player.y + p < e.y + e.height - p &&
+                    player.y + player.height - p > e.y + p
+                ) {
+                    gameOver();
+                    return;
+                }
+
+                if (e.y > canvas.height + 100) {
+                    enemies.splice(i, 1);
+                    score += 1;
+                    const gainedCoins = 2 * difficultyLevel;
+                    earnedInRun += gainedCoins;
+                    hudScore.textContent = score;
+                    hudCoins.textContent = coins + earnedInRun;
+                } else if (e.y < -160 && relativeSpeed < 0) {
+                    enemies.splice(i, 1);
+                }
+            }
+
+            updateAudioEngine();
+
+            const kmh = Math.round(player.currentSpeed * 11.5);
+            speedGauge.textContent = player.isBouncingLimiter ? `RAJOTIN! ${kmh} km/h` : `${kmh} km/h`;
+
+            // Particle Updates
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.alpha -= 0.03;
+                if (p.alpha <= 0) particles.splice(i, 1);
+            }
+
+            for (let i = flames.length - 1; i >= 0; i--) {
+                let f = flames[i];
+                f.life -= 0.12;
+                f.y += 2;
+                if (f.life <= 0) flames.splice(i, 1);
+            }
+        }
+
+        function drawCar(car, isPlayer = false) {
+            ctx.save();
+            
+            const centerX = car.x + car.width / 2;
+            const centerY = car.y + car.height / 2;
+            ctx.translate(centerX, centerY);
+
+            if (isPlayer) {
+                ctx.rotate(car.angle);
+            }
+
+            // Drop Shadow
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+            ctx.beginPath();
+            ctx.roundRect(-car.width / 2 + 3, -car.height / 2 + 4, car.width, car.height, 8);
+            ctx.fill();
+
+            // Main Body
+            ctx.fillStyle = car.color;
+            ctx.beginPath();
+            ctx.roundRect(-car.width / 2, -car.height / 2, car.width, car.height, 8);
+            ctx.fill();
+
+            // Glass Roof & Windows
+            ctx.fillStyle = 'rgba(0,0,0,0.25)';
+            ctx.fillRect(-car.width / 2 + 4, -car.height / 2 + 12, car.width - 8, car.height - 24);
+
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(-car.width / 2 + 5, -car.height / 2 + (isPlayer ? 12 : 38), car.width - 10, 12);
+            ctx.fillRect(-car.width / 2 + 5, -car.height / 2 + (isPlayer ? 38 : 12), car.width - 10, 8);
+
+            // Headlights & Taillights
+            ctx.fillStyle = isPlayer ? '#fef08a' : '#ef4444'; 
+            let lightY = isPlayer ? -car.height / 2 + 3 : car.height / 2 - 6;
+            ctx.fillRect(-car.width / 2 + 4, lightY, 6, 3);
+            ctx.fillRect(car.width / 2 - 10, lightY, 6, 3);
+
+            // Brake Glow
+            if (isPlayer && keys.s) {
+                ctx.fillStyle = '#ff1111';
+                ctx.shadowColor = '#ff0000';
+                ctx.shadowBlur = 12;
+                ctx.fillRect(-car.width / 2 + 4, car.height / 2 - 4, 8, 4);
+                ctx.fillRect(car.width / 2 - 12, car.height / 2 - 4, 8, 4);
+            }
+
+            ctx.restore();
+        }
+
+        function render() {
+            // Grass
+            ctx.fillStyle = '#15803d';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Road
+            ctx.fillStyle = '#334155';
+            ctx.fillRect(ROAD_LEFT, 0, ROAD_WIDTH, canvas.height);
+
+            // Outer Solid White Lines
+            ctx.fillStyle = '#f8fafc';
+            ctx.fillRect(ROAD_LEFT - 4, 0, 4, canvas.height);
+            ctx.fillRect(ROAD_LEFT + ROAD_WIDTH, 0, 4, canvas.height);
+
+            // Dashed Lane Lines
+            ctx.fillStyle = '#cbd5e1';
+            for (let l = 1; l < 4; l++) {
+                let laneX = ROAD_LEFT + (l * 80);
+                for (let y = -40; y < canvas.height; y += 40) {
+                    ctx.fillRect(laneX - 2, y + roadOffset, 4, 20);
+                }
+            }
+
+            // Draw Exhaust Flames
+            flames.forEach(f => {
+                ctx.save();
+                ctx.globalAlpha = f.life;
+                ctx.fillStyle = f.color;
+                ctx.beginPath();
+                ctx.arc(f.x, f.y, f.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            });
+
+            // Traffic Vehicles
+            enemies.forEach(enemy => drawCar(enemy, false));
+
+            // Player Vehicle
+            drawCar(player, true);
+
+            // Explosion Particles
+            particles.forEach(p => {
+                ctx.save();
+                ctx.globalAlpha = p.alpha;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            });
+        }
+
+        function gameLoop() {
+            if (!isGameRunning) return;
+            update();
+            render();
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        // Initialize UI & Render Initial Frame
+        applyTuningStats();
+        updateGarageUI();
+        render();
+    </script>
+</body>
+</html>
